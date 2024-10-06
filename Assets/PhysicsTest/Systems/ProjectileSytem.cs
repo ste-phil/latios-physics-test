@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using HotRoof.PhysicsTest.Components;
+using Latios.Psyshock;
 using Latios.Psyshock.Anna;
 using Latios.Systems;
 using Latios.Transforms;
@@ -10,8 +11,10 @@ using Unity.Entities;
 using Unity.Mathematics;
 using UnityEditor.Rendering;
 using UnityEngine;
+using BoxCollider = Latios.Psyshock.BoxCollider;
 using Collider = Latios.Psyshock.Collider;
 using Physics = Latios.Psyshock.Physics;
+using SphereCollider = Latios.Psyshock.SphereCollider;
 
 namespace HotRoof.PhysicsTest.Systems
 {
@@ -31,6 +34,11 @@ namespace HotRoof.PhysicsTest.Systems
     [BurstCompile]
     public partial struct ProjectileSystem : ISystem
     {
+        public void OnCreate(ref SystemState state)
+        {
+            state.RequireForUpdate<ComponentDatabase>();
+        }
+
         [BurstCompile]
         public void OnUpdate(ref SystemState state)
         {
@@ -45,6 +53,28 @@ namespace HotRoof.PhysicsTest.Systems
 
             var allColliders = qAllCollidersExceptProjectiles.ToComponentDataArray<Collider>(Allocator.TempJob);
             var allPositions = qAllCollidersExceptProjectiles.ToComponentDataArray<WorldTransform>(Allocator.TempJob);
+            
+            
+            var qProjectiles = SystemAPI
+                .QueryBuilder()
+                .WithAll<ComponentProjectile, WorldTransform, Collider>()
+                .Build();
+
+            var projectiles = qProjectiles.ToComponentDataArray<ComponentProjectile>(Allocator.TempJob);
+            var projectilesColliders = qProjectiles.ToComponentDataArray<Collider>(Allocator.TempJob);
+            var projectileTransforms = qProjectiles.ToComponentDataArray<WorldTransform>(Allocator.TempJob);
+
+            // m_handle.Update(ref state);
+            // var settings = new CollisionLayerSettings
+            // {
+            //     worldAabb = new Aabb(-db.MapSize, db.MapSize), 
+            //     worldSubdivisionsPerAxis = new int3((int) db.MapSize / 8, 1, (int)db.MapSize / 8),
+            // };
+            //
+            // state.Dependency = Physics
+            //     .BuildCollisionLayer(m_allColliders, in m_handle)
+            //     .WithSettings(settings)
+            //     .ScheduleParallel(out var layer, Allocator.TempJob, state.Dependency);
             
             
             // Spawn projectiles from requests
@@ -68,12 +98,22 @@ namespace HotRoof.PhysicsTest.Systems
                 DeltaTime = dt
             }.ScheduleParallel(state.Dependency);
             
+            // Debug.Log("All:" + allColliders.Length);
+            // Debug.Log("Proj:" + SystemAPI.QueryBuilder().WithAll<ComponentProjectile>().Build().CalculateEntityCount());
             state.Dependency = new CheckCollisionJob
             {
                 AllColliders = allColliders,
-                EnemyPositions = allPositions
+                AllColliderPositions = allPositions
             }.ScheduleParallel(state.Dependency);
+            
+            // state.Dependency = new CheckCollisionWithEnemyJob()
+            // {
+            //     Projectiles = projectiles,
+            //     ProjectileColliders = projectilesColliders,
+            //     ProjectileTransforms = projectileTransforms
+            // }.ScheduleParallel(state.Dependency);
 
+            
             cb = new EntityCommandBuffer(state.WorldUpdateAllocator);
             state.Dependency = new DestroyProjectilesJob
             {
@@ -118,21 +158,123 @@ namespace HotRoof.PhysicsTest.Systems
     partial struct CheckCollisionJob : IJobEntity
     {
         [DeallocateOnJobCompletion, ReadOnly] public NativeArray<Collider> AllColliders;
-        [DeallocateOnJobCompletion, ReadOnly] public NativeArray<WorldTransform> EnemyPositions;
+        [DeallocateOnJobCompletion, ReadOnly] public NativeArray<WorldTransform> AllColliderPositions;
         
+        public void Execute(ref ComponentProjectile projectile, in Collider projCollider, in WorldTransform projTransform)
+        {
+            for (int i = 0; i < AllColliders.Length; i++)
+            {
+                var col = AllColliders[i];
+                var pos = AllColliderPositions[i];
+                var projectilePos = GetColliderCenterWorld(in projCollider, in projTransform);
+                // if (Physics.DistanceBetween(
+                //         in projCollider, 
+                //         in projTransform.worldTransform, 
+                //         in col, 
+                //         in pos.worldTransform, 
+                //         0f, 
+                //         out _))
+                // {
+                //     projectile.TimeTillDestroy = 0;
+                //     break;
+                // }
+                if (Overlaps(in projectilePos, in col, in pos))
+                {
+                    projectile.TimeTillDestroy = 0;
+                    break;
+                }
+            }
+        }
+
+        public float3 GetColliderCenterWorld(in Collider collider, in WorldTransform colTransform)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                    var sphere = (SphereCollider)collider;
+                    return colTransform.worldTransform.position + sphere.center * colTransform.scale;
+                case ColliderType.Box:
+                    var box = (BoxCollider)collider;
+                    return colTransform.worldTransform.position + box.center * colTransform.scale;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+        
+        public bool Overlaps(in float3 point, in Collider collider, in WorldTransform colTransform)
+        {
+            switch (collider.type)
+            {
+                case ColliderType.Sphere:
+                    var sphere = (SphereCollider)collider;
+                    var distance = math.distance(point, colTransform.worldTransform.position);
+                    return distance <= sphere.radius * colTransform.scale;
+                case ColliderType.Box:
+                    var box = (BoxCollider)collider;
+                    var localPoint = math.mul(math.inverse(colTransform.worldTransform.rotation), point - colTransform.worldTransform.position);
+                    var collides = math.all(math.abs(localPoint) <= (box.halfSize + box.center) * colTransform.scale);
+                    // if (collides)
+                    //     Debug.Log("Collides: " + point + " " + colTransform.worldTransform.position);
+                    // return false;
+                    return collides;
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+    }
+
+    [BurstCompile]
+    partial struct CheckCollisionWithEnemyJob : IJobEntity
+    {
+        [DeallocateOnJobCompletion, WriteOnly, NativeDisableParallelForRestriction] 
+        public NativeArray<ComponentProjectile> Projectiles;
+        [DeallocateOnJobCompletion, ReadOnly] 
+        public NativeArray<WorldTransform> ProjectileTransforms;
+        [DeallocateOnJobCompletion, ReadOnly] 
+        public NativeArray<Collider> ProjectileColliders;
+        
+        public void Execute(ref ComponentEnemy enemy, in Collider collider, in WorldTransform transform)
+        {
+            for (int i = 0; i < Projectiles.Length; i++)
+            {
+                ref var proj = ref Projectiles.AsSpan()[i];
+                var col = ProjectileColliders[i];
+                var pos = ProjectileTransforms[i];
+                if (Physics.DistanceBetween(
+                        in collider, 
+                        in transform.worldTransform, 
+                        col, 
+                        pos.worldTransform, 
+                        0f, 
+                        out _))
+                {
+                    proj.TimeTillDestroy = 0;
+                    break;
+                }
+            }
+        }
+    }
+
+    [BurstCompile]
+    partial struct CheckCollisionWithEnvironmentJob : IJobEntity
+    {
+        [DeallocateOnJobCompletion, ReadOnly] public NativeArray<Collider> AllColliders;
+        [DeallocateOnJobCompletion, ReadOnly] public NativeArray<WorldTransform> AllColliderPositions;
+
         public void Execute(ref ComponentProjectile projectile, in Collider collider, in WorldTransform transform)
         {
             for (int i = 0; i < AllColliders.Length; i++)
             {
-                var enemyCollider = AllColliders[i];
-                var enemyPos = EnemyPositions[i];
+                var col = AllColliders[i];
+                var pos = AllColliderPositions[i];
                 if (Physics.DistanceBetween(
-                        in collider, 
-                        in transform.worldTransform, 
-                        enemyCollider, 
-                        enemyPos.worldTransform, 
-                        0f, 
-                        out _))
+                        in collider,
+                        in transform.worldTransform,
+                        col,
+                        pos.worldTransform,
+                        0f,
+                        out _
+                    ))
                 {
                     projectile.TimeTillDestroy = 0;
                     break;

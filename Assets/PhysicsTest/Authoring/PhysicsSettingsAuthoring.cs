@@ -14,6 +14,7 @@ namespace HotRoof.PhysicsTest.Authoring
         public float3 Gravity = new float3(0f, -9.81f, 0f);
         public float LinearDamping = 0.3f;
         public float AngularDamping = 0.3f;
+        public byte SolverIterations = 4;
 
         public class PhysicsSettingsBaker : Baker<PhysicsSettingsAuthoring>
         {
@@ -30,7 +31,8 @@ namespace HotRoof.PhysicsTest.Authoring
                         },
                         gravity = authoring.Gravity,
                         linearDamping = (half)authoring.LinearDamping,
-                        angularDamping = (half)authoring.AngularDamping
+                        angularDamping = (half)authoring.AngularDamping,
+                        numIterations = authoring.SolverIterations
                     }
                 );
             }

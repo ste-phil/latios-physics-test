@@ -19,18 +19,19 @@ namespace HotRoof.PhysicsTest.Systems
     {
         private Random m_rnd;
         private BuildCollisionLayerTypeHandles m_handle;
-        private EntityQuery m_allCollidersExceptEnemyQuery;
+        private EntityQuery m_allColliders;
 
         public void OnCreate(ref SystemState state)
         {
             m_handle = new BuildCollisionLayerTypeHandles(ref state);
             m_rnd = new Random(123);
-            m_allCollidersExceptEnemyQuery = state
+            m_allColliders = state
                 .Fluent()
                 .With<Collider>(true)
-                .Without<ComponentEnemy>(true)
                 .PatchQueryForBuildingCollisionLayer()
                 .Build();
+            
+            state.RequireForUpdate<ComponentDatabase>();
         }
 
         [BurstCompile]
@@ -38,18 +39,6 @@ namespace HotRoof.PhysicsTest.Systems
         {
             if (!SystemAPI.TryGetSingleton<ComponentDatabase>(out var db))
                 throw new Exception($"An entity-component of type '{nameof(ComponentDatabase)}' is required in the subscene.");
-
-            int activeEnemies = SystemAPI.QueryBuilder().WithAll<ComponentEnemy>().Build().CalculateEntityCount();
-            for (int i = activeEnemies; i < db.MaxEnemies; i++)
-            {
-                var e = state.EntityManager.Instantiate(db.EnemyPrefab);
-                var transform = SystemAPI.GetComponent<WorldTransform>(db.EnemyPrefab);
-                transform.worldTransform.position = m_rnd.NextFloat3(-db.MapSize / 2, db.MapSize / 2);
-                transform.worldTransform.position.y = 0;
-                transform.worldTransform.rotation = quaternion.EulerXYZ(0, m_rnd.NextFloat(0, math.PI2), 0);
-                
-                state.EntityManager.AddComponentData(e, transform);
-            }
             
             m_handle.Update(ref state);
             var settings = new CollisionLayerSettings
@@ -59,18 +48,18 @@ namespace HotRoof.PhysicsTest.Systems
             };
             
             state.Dependency = Physics
-                .BuildCollisionLayer(m_allCollidersExceptEnemyQuery, in m_handle)
+                .BuildCollisionLayer(m_allColliders, in m_handle)
                 .WithSettings(settings)
                 .ScheduleParallel(out var layer, Allocator.TempJob, state.Dependency);
             
-            state.Dependency = new MoveEnemiesJob
+            state.Dependency = new EnemyMoveJob
             {
                 DeltaTime = SystemAPI.Time.DeltaTime
             }.ScheduleParallel(state.Dependency);
             
-            state.Dependency = new AvoidContactsJob
+            state.Dependency = new EnemyAvoidContactsJob
             {
-                Random = new Random((uint)(SystemAPI.Time.DeltaTime * 1000)),
+                Random = m_rnd,
                 Layer = layer
             }.ScheduleParallel(state.Dependency);
             layer.Dispose(state.Dependency);
@@ -78,7 +67,7 @@ namespace HotRoof.PhysicsTest.Systems
     }
     
     [BurstCompile]
-    partial struct MoveEnemiesJob : IJobEntity
+    partial struct EnemyMoveJob : IJobEntity
     {
         public float DeltaTime;
 
@@ -89,18 +78,19 @@ namespace HotRoof.PhysicsTest.Systems
     }
     
     [BurstCompile]
-    partial struct AvoidContactsJob : IJobEntity
+    [WithAll(typeof(ComponentEnemyAvoidContacts))]
+    partial struct EnemyAvoidContactsJob : IJobEntity
     {
         [ReadOnly] public CollisionLayer Layer;
         public Random Random;
 
-        public void Execute(ref ComponentEnemy enemy, TransformAspect transform)
+        public void Execute(ref ComponentEnemy enemy, ref WorldTransform transform)
         {
-            var ray = new Ray(transform.worldPosition + new float3(0, .5f, 0), transform.forwardDirection, 2.0f);
+            var ray = new Ray(transform.position + new float3(0, .5f, 0), transform.forwardDirection, 2.0f);
             if (Physics.Raycast(ray, Layer, out var hit, out var info))
             {
                 var sign = Random.NextInt(0, 2) * 2 - 1;
-                transform.worldRotation = math.mul(transform.worldRotation, quaternion.RotateY(sign * math.PI / 2));
+                transform.worldTransform.rotation = math.mul(transform.rotation, quaternion.RotateY(sign * math.PI / 2));
             }
         }
     }

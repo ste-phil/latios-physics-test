@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 129940049489956554}
   - component: {fileID: 4102867141592415848}
   - component: {fileID: 5485591893993964788}
-  - component: {fileID: 8624809904439652673}
+  - component: {fileID: 7313434403024807165}
   m_Layer: 0
   m_Name: Player
   m_TagString: Untagged
@@ -47,7 +47,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0894e82bcafa42b49f7db5f1e2a55b28, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  Speed: 9
+  Speed: 0.26
+  BreakingSpeed: 0.05
 --- !u!65 &5485591893993964788
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -69,33 +70,34 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0.5, z: 0}
---- !u!54 &8624809904439652673
-Rigidbody:
+--- !u!114 &7313434403024807165
+MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 405105733052751726}
-  serializedVersion: 4
-  m_Mass: 1
-  m_Drag: 6.89
-  m_AngularDrag: 0.05
-  m_CenterOfMass: {x: 0, y: 0, z: 0}
-  m_InertiaTensor: {x: 1, y: 1, z: 1}
-  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ImplicitCom: 1
-  m_ImplicitTensor: 1
-  m_UseGravity: 1
-  m_IsKinematic: 0
-  m_Interpolate: 0
-  m_Constraints: 84
-  m_CollisionDetection: 0
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ecef7b0e4f6a3a438ec389f19d24713, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  mass: 1
+  coefficientOfFriction: 0
+  coefficientOfRestitution: 0.3
+  lockPositionAxes:
+    x: 0
+    y: 0
+    z: 0
+  lockRotationAxes:
+    x: 0
+    y: 0
+    z: 0
+  forceLockAxesExists: 0
+  initialVelocity:
+    x: 0
+    y: 0
+    z: 0
 --- !u!1 &1351383702497830995
 GameObject:
   m_ObjectHideFlags: 0

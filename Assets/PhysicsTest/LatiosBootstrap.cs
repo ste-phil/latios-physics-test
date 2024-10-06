@@ -15,7 +15,7 @@ public class LatiosBakingBootstrap : ICustomBakingBootstrap
         Latios.Kinemation.Authoring.KinemationBakingBootstrap.InstallKinemation(ref context);
         //Latios.Mimic.Authoring.MimicBakingBootstrap.InstallMecanimAddon(ref context);
         
-        Latios.Psyshock.Anna.Authoring.AnnaBakingBootstrap.InstallAnna(ref context);
+        Latios.Psyshock.Anna.Authoring.AnnaBakingBootstrap.InstallAnnaUnityBakers(ref context);
 
     }
 }

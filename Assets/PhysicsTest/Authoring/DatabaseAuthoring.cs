@@ -5,10 +5,12 @@ namespace HotRoof.PhysicsTest.Components
 {
     public class DatabaseAuthoring : MonoBehaviour
     {
+        public Example SelectedExample;
+        
         public GameObject ProjectilePrefab;
         public GameObject EnemyPrefab;
         public int MaxEnemies;
-
+        
         public class DatabaseBaker : Baker<DatabaseAuthoring>
         {
             public override void Bake(DatabaseAuthoring authoring)
@@ -22,7 +24,8 @@ namespace HotRoof.PhysicsTest.Components
                         ProjectilePrefab = GetEntity(authoring.ProjectilePrefab, TransformUsageFlags.Dynamic),
                         EnemyPrefab = GetEntity(authoring.EnemyPrefab, TransformUsageFlags.Dynamic),
                         MaxEnemies = authoring.MaxEnemies,
-                        MapSize = scale.x * 10 // Multiply scale by 10 since we use a plane as base mesh
+                        MapSize = scale.x * 10, // Multiply scale by 10 since we use a plane as base mesh,
+                        Scenario = authoring.SelectedExample
                     }
                 );
             }

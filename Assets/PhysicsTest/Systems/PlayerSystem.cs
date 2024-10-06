@@ -36,8 +36,7 @@ namespace HotRoof.PhysicsTest.Systems
                 //apply damping if no input is given
                 if (math.all(change == 0))
                 {
-                    var damping = 0.02f;
-                    var dampingForce = -rigidBody.ValueRW.velocity.linear.xz * damping;
+                    var dampingForce = -rigidBody.ValueRW.velocity.linear.xz * player.BreakingSpeed;
                     addImpulseBuffer.Add(
                         new AddImpulse(new float3(dampingForce.x, 0, dampingForce.y))
                     );
@@ -66,8 +65,7 @@ namespace HotRoof.PhysicsTest.Systems
                 //         new AddImpulse(math.normalize(change) * player.Speed * rigidBody.ValueRW.inverseMass)
                 //     );
                 // }
-                //
-                // transform.worldPosition += player.Speed * SystemAPI.Time.DeltaTime * change;
+
 
                 // Look at mouse
                 var mousePosition = mouse.position.ReadValue();

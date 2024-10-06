@@ -11,6 +11,7 @@ namespace HotRoof.PhysicsTest.Systems
     {
         protected override void CreateSystems()
         {
+            GetOrCreateAndAddUnmanagedSystem<EnemySpawnSystem>();
             GetOrCreateAndAddUnmanagedSystem<EnemySystem>();
             
             GetOrCreateAndAddManagedSystem<PlayerSystem>();
